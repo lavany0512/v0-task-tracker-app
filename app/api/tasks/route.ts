@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db/mongodb"
 import { getSession } from "@/lib/auth/jwt"
-import { createTaskSchema, type TaskStatus } from "@/lib/db/schemas"
+import { createTaskSchema, type TaskStatus, type TaskPriority } from "@/lib/db/schemas"
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,9 +12,14 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") as TaskStatus | null
+    const priority = searchParams.get("priority") as TaskPriority | null
     const search = searchParams.get("search")
     const page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "10")
+    const sortBy = searchParams.get("sortBy") || "createdAt"
+    const sortOrder = searchParams.get("sortOrder") || "desc"
+    const dueDateFrom = searchParams.get("dueDateFrom")
+    const dueDateTo = searchParams.get("dueDateTo")
     const skip = (page - 1) * limit
 
     const db = await getDb()
@@ -23,16 +28,38 @@ export async function GET(request: NextRequest) {
     // Build query
     const query: Record<string, unknown> = { userId: session.userId }
 
+    // Status filter
     if (status && status !== "All") {
       query.status = status
     }
 
+    // Priority filter
+    if (priority && priority !== "All") {
+      query.priority = priority
+    }
+
+    // Search filter
     if (search) {
       query.$or = [{ title: { $regex: search, $options: "i" } }, { description: { $regex: search, $options: "i" } }]
     }
 
+    // Date range filter
+    if (dueDateFrom || dueDateTo) {
+      query.dueDate = {}
+      if (dueDateFrom) {
+        ;(query.dueDate as Record<string, unknown>).$gte = new Date(dueDateFrom)
+      }
+      if (dueDateTo) {
+        ;(query.dueDate as Record<string, unknown>).$lte = new Date(dueDateTo)
+      }
+    }
+
+    // Build sort options
+    const sortOptions: Record<string, 1 | -1> = {}
+    sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1
+
     const [tasks, total] = await Promise.all([
-      tasksCollection.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(),
+      tasksCollection.find(query).sort(sortOptions).skip(skip).limit(limit).toArray(),
       tasksCollection.countDocuments(query),
     ])
 
@@ -72,12 +99,14 @@ export async function POST(request: NextRequest) {
     const db = await getDb()
     const tasksCollection = db.collection("tasks")
 
-    const result = await tasksCollection.insertOne({
+    const taskData = {
       ...validation.data,
       userId: session.userId,
       createdAt: new Date(),
       updatedAt: new Date(),
-    })
+    }
+
+    const result = await tasksCollection.insertOne(taskData)
 
     return NextResponse.json({
       task: {

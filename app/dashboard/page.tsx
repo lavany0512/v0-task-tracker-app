@@ -32,10 +32,10 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-muted/30">
       <DashboardHeader />
-      <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Welcome back, {user.name.split(" ")[0]}!</h1>
-          <p className="text-muted-foreground mt-1">Here are your tasks for today</p>
+      <main className="container py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Welcome back, {user.name.split(" ")[0]}!</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Here are your tasks for today</p>
         </div>
         <TaskList />
       </main>
