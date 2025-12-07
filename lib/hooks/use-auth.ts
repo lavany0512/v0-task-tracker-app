@@ -25,8 +25,15 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       setLoading: (isLoading) => set({ isLoading }),
       logout: async () => {
-        await fetch("/api/auth/logout", { method: "POST" })
-        set({ user: null })
+        try {
+          console.log("[v0] Logging out...")
+          await fetch("/api/auth/logout", { method: "POST" })
+          console.log("[v0] Logout complete")
+          set({ user: null })
+        } catch (error) {
+          console.error("[v0] Logout error:", error)
+          set({ user: null })
+        }
       },
     }),
     {
@@ -42,14 +49,18 @@ export function useAuth() {
   const checkAuth = async () => {
     setLoading(true)
     try {
+      console.log("[v0] Checking auth...")
       const res = await fetch("/api/auth/me")
       if (res.ok) {
         const data = await res.json()
+        console.log("[v0] Auth check success:", data.user.email)
         setUser(data.user)
       } else {
+        console.log("[v0] Auth check failed, clearing user")
         setUser(null)
       }
-    } catch {
+    } catch (error) {
+      console.error("[v0] Auth check error:", error)
       setUser(null)
     } finally {
       setLoading(false)

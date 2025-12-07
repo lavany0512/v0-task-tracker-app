@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth/jwt"
 export async function GET() {
   try {
     const session = await getSession()
+    console.log("[v0] Session check:", session ? "Found" : "Not found")
+
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -16,7 +18,7 @@ export async function GET() {
       },
     })
   } catch (error) {
-    console.error("Get session error:", error)
+    console.error("[v0] Get session error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

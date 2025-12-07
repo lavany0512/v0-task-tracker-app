@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getDb } from "@/lib/db/mongodb"
+import { getDb, isMongoConfigured } from "@/lib/db/mongodb"
 import { getSession } from "@/lib/auth/jwt"
 import { createTaskSchema, type TaskStatus, type TaskPriority } from "@/lib/db/schemas"
 
@@ -8,6 +8,13 @@ export async function GET(request: NextRequest) {
     const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!isMongoConfigured()) {
+      return NextResponse.json(
+        { error: "Database not configured. Please add MONGODB_URI to environment variables." },
+        { status: 503 },
+      )
     }
 
     const { searchParams } = new URL(request.url)
@@ -22,7 +29,17 @@ export async function GET(request: NextRequest) {
     const dueDateTo = searchParams.get("dueDateTo")
     const skip = (page - 1) * limit
 
-    const db = await getDb()
+    let db
+    try {
+      db = await getDb()
+    } catch (dbError) {
+      console.error("[v0] Database connection error:", dbError)
+      return NextResponse.json(
+        { error: "Unable to connect to database. Please check your MONGODB_URI." },
+        { status: 503 },
+      )
+    }
+
     const tasksCollection = db.collection("tasks")
 
     // Build query
@@ -58,10 +75,14 @@ export async function GET(request: NextRequest) {
     const sortOptions: Record<string, 1 | -1> = {}
     sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1
 
+    console.log("[v0] Fetching tasks for user:", session.userId)
+
     const [tasks, total] = await Promise.all([
       tasksCollection.find(query).sort(sortOptions).skip(skip).limit(limit).toArray(),
       tasksCollection.countDocuments(query),
     ])
+
+    console.log("[v0] Found tasks:", tasks.length, "total:", total)
 
     return NextResponse.json({
       tasks: tasks.map((task) => ({
@@ -76,7 +97,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Get tasks error:", error)
+    console.error("[v0] Get tasks error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -88,15 +109,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    if (!isMongoConfigured()) {
+      return NextResponse.json(
+        { error: "Database not configured. Please add MONGODB_URI to environment variables." },
+        { status: 503 },
+      )
+    }
+
     const body = await request.json()
+    console.log("[v0] Create task request:", body)
 
     // Validate input
     const validation = createTaskSchema.safeParse(body)
     if (!validation.success) {
+      console.log("[v0] Validation error:", validation.error.errors)
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 })
     }
 
-    const db = await getDb()
+    let db
+    try {
+      db = await getDb()
+    } catch (dbError) {
+      console.error("[v0] Database connection error:", dbError)
+      return NextResponse.json(
+        { error: "Unable to connect to database. Please check your MONGODB_URI." },
+        { status: 503 },
+      )
+    }
+
     const tasksCollection = db.collection("tasks")
 
     const taskData = {
@@ -107,17 +147,20 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await tasksCollection.insertOne(taskData)
+    console.log("[v0] Task created with ID:", result.insertedId.toString())
 
     return NextResponse.json({
       task: {
         _id: result.insertedId.toString(),
         ...validation.data,
         userId: session.userId,
+        createdAt: taskData.createdAt,
+        updatedAt: taskData.updatedAt,
       },
       message: "Task created successfully",
     })
   } catch (error) {
-    console.error("Create task error:", error)
+    console.error("[v0] Create task error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

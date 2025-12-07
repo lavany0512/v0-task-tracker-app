@@ -1,16 +1,16 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/hooks/use-auth"
-import { Loader2, Mail, Lock, User } from "lucide-react"
+import { Loader2, Mail, Lock, User, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
 export function RegisterForm() {
@@ -18,6 +18,7 @@ export function RegisterForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
   const { setUser, setLoading } = useAuth()
@@ -25,8 +26,10 @@ export function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
     try {
+      console.log("[v0] Submitting register form...")
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -34,6 +37,7 @@ export function RegisterForm() {
       })
 
       const data = await res.json()
+      console.log("[v0] Register response:", { status: res.status, ok: res.ok })
 
       if (!res.ok) {
         throw new Error(data.error || "Registration failed")
@@ -46,10 +50,14 @@ export function RegisterForm() {
         description: "Your account has been created successfully.",
       })
       router.push("/dashboard")
-    } catch (error) {
+      router.refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Registration failed"
+      console.log("[v0] Register error:", message)
+      setError(message)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Registration failed",
+        description: message,
         variant: "destructive",
       })
     } finally {
@@ -65,6 +73,12 @@ export function RegisterForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <div className="relative">
@@ -77,6 +91,7 @@ export function RegisterForm() {
                 onChange={(e) => setName(e.target.value)}
                 className="pl-10"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -92,6 +107,7 @@ export function RegisterForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -108,12 +124,13 @@ export function RegisterForm() {
                 className="pl-10"
                 minLength={6}
                 required
+                disabled={isLoading}
               />
             </div>
             <p className="text-xs text-muted-foreground">Must be at least 6 characters</p>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
+        <CardFooter className="flex flex-col gap-4">
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create account

@@ -14,12 +14,16 @@ interface TasksResponse {
 }
 
 const fetcher = async (url: string) => {
+  console.log("[v0] Fetching tasks from:", url)
   const res = await fetch(url)
   if (!res.ok) {
     const error = await res.json()
+    console.error("[v0] Fetch error:", error)
     throw new Error(error.error || "Failed to fetch")
   }
-  return res.json()
+  const data = await res.json()
+  console.log("[v0] Tasks fetched:", data.tasks?.length || 0)
+  return data
 }
 
 export function useTasks(
@@ -66,33 +70,48 @@ export function useTasks(
   })
 
   const createTask = async (taskData: Partial<Task>) => {
+    console.log("[v0] Creating task:", taskData)
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(taskData),
     })
     const result = await res.json()
-    if (!res.ok) throw new Error(result.error)
+    if (!res.ok) {
+      console.error("[v0] Create task error:", result.error)
+      throw new Error(result.error)
+    }
+    console.log("[v0] Task created:", result.task._id)
     mutate()
     return result
   }
 
   const updateTask = async (id: string, taskData: Partial<Task>) => {
+    console.log("[v0] Updating task:", id, taskData)
     const res = await fetch(`/api/tasks/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(taskData),
     })
     const result = await res.json()
-    if (!res.ok) throw new Error(result.error)
+    if (!res.ok) {
+      console.error("[v0] Update task error:", result.error)
+      throw new Error(result.error)
+    }
+    console.log("[v0] Task updated:", id)
     mutate()
     return result
   }
 
   const deleteTask = async (id: string) => {
+    console.log("[v0] Deleting task:", id)
     const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" })
     const result = await res.json()
-    if (!res.ok) throw new Error(result.error)
+    if (!res.ok) {
+      console.error("[v0] Delete task error:", result.error)
+      throw new Error(result.error)
+    }
+    console.log("[v0] Task deleted:", id)
     mutate()
     return result
   }

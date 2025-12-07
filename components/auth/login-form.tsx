@@ -1,22 +1,23 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/hooks/use-auth"
-import { Loader2, Mail, Lock } from "lucide-react"
+import { Loader2, Mail, Lock, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
   const { setUser, setLoading } = useAuth()
@@ -24,8 +25,10 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
     try {
+      console.log("[v0] Submitting login form...")
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,6 +36,7 @@ export function LoginForm() {
       })
 
       const data = await res.json()
+      console.log("[v0] Login response:", { status: res.status, ok: res.ok })
 
       if (!res.ok) {
         throw new Error(data.error || "Login failed")
@@ -45,10 +49,14 @@ export function LoginForm() {
         description: "You have successfully logged in.",
       })
       router.push("/dashboard")
-    } catch (error) {
+      router.refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Login failed"
+      console.log("[v0] Login error:", message)
+      setError(message)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Login failed",
+        description: message,
         variant: "destructive",
       })
     } finally {
@@ -64,6 +72,12 @@ export function LoginForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
@@ -76,6 +90,7 @@ export function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -91,11 +106,12 @@ export function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="pl-10"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
+        <CardFooter className="flex flex-col gap-4">
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign in
